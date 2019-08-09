@@ -1,6 +1,6 @@
 from unittest import TestCase
 from preliminary_protocoll import PreliminaryPriest
-from message import Message
+from message import Packet
 
 
 class TestPreliminaryPriest(TestCase):
@@ -8,5 +8,5 @@ class TestPreliminaryPriest(TestCase):
         self.priest = PreliminaryPriest()
 
     def test_receive(self):
-        message = Message(0, "Hello world", 1)
+        message = Packet(0, "Hello world", 1)
         self.priest.receive(message)

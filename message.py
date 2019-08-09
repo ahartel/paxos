@@ -1,4 +1,4 @@
-class Message:
+class Packet:
     def __init__(self, source, message, target):
         self.__source = source
         self.__message = message
@@ -19,6 +19,9 @@ class Message:
 
     def get_message(self):
         return self.__message
+
+    def set_source(self, source):
+        self.__source = source
 
     def __str__(self):
         if self.is_broadcast():

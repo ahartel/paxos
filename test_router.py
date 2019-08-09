@@ -1,6 +1,6 @@
 from unittest import TestCase
 from router import Router
-from message import Message
+from message import Packet
 from unittest.mock import Mock
 
 
@@ -20,22 +20,24 @@ class TestRouter(TestCase):
         receiver2 = Mock()
         self.router.add(receiver1)
         self.router.add(receiver2)
-        message = Message(2, "Hello world", None)
+        message = Packet(2, "Hello world", None)
         self.router.broadcast(message)
+        self.router.distribute()
         receiver1.receive.assert_called_with(message)
         receiver2.receive.assert_called_with(message)
 
     def test_send(self):
         sender = Mock()
         receiver = Mock()
-        message = Message(0, "Hello world", 1)
+        message = Packet(0, "Hello world", 1)
         self.router.add(sender)
         self.router.add(receiver)
         self.router.send(message)
+        self.router.distribute()
         receiver.receive.assert_called_with(message)
 
     def test_send_not_broadcast(self):
-        message = Message(0, "Hello world", None)
+        message = Packet(0, "Hello world", None)
         self.assertRaises(AssertionError, self.router.send, message)
 
     def tearDown(self) -> None:
