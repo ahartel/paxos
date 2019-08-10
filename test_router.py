@@ -18,23 +18,25 @@ class TestRouter(TestCase):
     def test_broadcast(self):
         receiver1 = Mock()
         receiver2 = Mock()
+        sender = Mock()
         self.router.add(receiver1)
         self.router.add(receiver2)
-        message = Packet(2, "Hello world", None)
-        self.router.broadcast(message)
+        self.router.add(sender)
+        message_sent = Packet(sender, "Hello world", None)
+        self.router.broadcast(message_sent)
         self.router.distribute()
-        receiver1.receive.assert_called_with(message)
-        receiver2.receive.assert_called_with(message)
+        receiver1.receive.assert_called_once()
+        receiver2.receive.assert_called_once()
 
     def test_send(self):
         sender = Mock()
         receiver = Mock()
-        message = Packet(0, "Hello world", 1)
+        message = Packet(sender, "Hello world", 1)
         self.router.add(sender)
         self.router.add(receiver)
         self.router.send(message)
         self.router.distribute()
-        receiver.receive.assert_called_with(message)
+        receiver.receive.assert_called_once()
 
     def test_send_not_broadcast(self):
         message = Packet(0, "Hello world", None)
