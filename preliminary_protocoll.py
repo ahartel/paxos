@@ -1,5 +1,6 @@
 from router import Router
 from message import Packet
+from collections import deque
 import re
 
 
@@ -8,6 +9,7 @@ class PreliminaryPriest:
         self.__router = None
         self.__initiated_ballot = None
         self.__num_participants = 0
+        self.__quorum = 0
         self.__num_received_last_vote = 0
         self.__last_decree_received = None
         self.__last_ballot_voted = None
@@ -15,6 +17,7 @@ class PreliminaryPriest:
         self.__max_ballot_received = None
         self.__received_votes = []
         self.__proposed_decree = None
+        self.__queue = deque()
 
     def get_decree(self):
         return self.__decree
@@ -24,7 +27,7 @@ class PreliminaryPriest:
         match = pattern.match(packet.get_message())
         if match:
             ballot = int(match.group(1))
-            self.__router.send(Packet(self, "LastVote({},{})".format(ballot, -1), packet.get_source()))
+            self.__queue.append(Packet(self, "LastVote({},{})".format(ballot, -1), packet.get_source()))
             self.__max_ballot_received = ballot
 
     def process_last_vote(self, packet):
@@ -38,7 +41,7 @@ class PreliminaryPriest:
         if self.__num_received_last_vote == self.__num_participants:
             self.__proposed_decree = 23
             send = Packet(self, "BeginBallot({},{})".format(self.__initiated_ballot, self.__proposed_decree), None)
-            self.__router.broadcast(send)
+            self.__queue.append(send)
 
     def process_begin_ballot(self, packet):
         pattern = re.compile("BeginBallot\(([0-9]+),([\-0-9]+)\)")
@@ -49,7 +52,7 @@ class PreliminaryPriest:
             if ballot == self.__max_ballot_received:
                 self.__last_decree_received = decree
                 self.__last_ballot_voted = ballot
-                self.__router.send(Packet(self, "Voted({})".format(ballot), packet.get_source()))
+                self.__queue.append(Packet(self, "Voted({})".format(ballot), packet.get_source()))
 
     def process_voted(self, packet):
         pattern = re.compile("Voted\(([0-9]+)\)")
@@ -58,8 +61,8 @@ class PreliminaryPriest:
             ballot = int(match.group(1))
             if ballot == self.__initiated_ballot:
                 self.__received_votes.append(packet.get_source())
-        if len(self.__received_votes) == self.__num_participants:
-            self.__router.broadcast(Packet(self, "Success({})".format(self.__proposed_decree), None))
+        if len(self.__received_votes) >= self.__quorum:
+            self.__queue.append(Packet(self, "Success({})".format(self.__proposed_decree), None))
 
     def process_success(self, packet):
         pattern = re.compile("Success\(([0-9]+)\)")
@@ -83,13 +86,22 @@ class PreliminaryPriest:
 
     def connect_to(self, router):
         self.__router = router
-        router.add(self)
+        router.add_endpoint(self)
 
     def initiate_ballot(self):
         self.__initiated_ballot = 0
         message = Packet(self, "NextBallot({})".format(self.__initiated_ballot), None)
         self.__num_participants = self.__router.get_num_endpoints()
-        self.__router.broadcast(message)
+        self.__quorum = int(self.__num_participants/2)+1
+        self.__queue.append(message)
+
+    def distribute(self):
+        if len(self.__queue) > 0:
+            message = self.__queue.popleft()
+            if message.is_broadcast():
+                self.__router.broadcast(message)
+            else:
+                self.__router.send(message)
 
 
 def create_priests(num):
@@ -112,7 +124,10 @@ def main():
         priest.connect_to(router)
 
     priests[0].initiate_ballot()
-    router.distribute()
+    for t in range(30):
+        router.distribute()
+        for priest in priests:
+            priest.distribute()
 
     print_log(router)
 
