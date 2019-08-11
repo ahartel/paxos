@@ -68,3 +68,6 @@ class Router:
 
     def get_log(self):
         return self.__log
+
+    def reset_log(self):
+        self.__log.clear()

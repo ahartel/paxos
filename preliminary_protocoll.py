@@ -98,6 +98,7 @@ class PreliminaryPriest:
         self.__num_participants = self.__router.get_num_endpoints()
         self.__quorum = int(self.__num_participants/2)+1
         self.__queue.append(message)
+        self.__num_received_last_vote = 0
 
     def distribute(self):
         self.__time += 1
@@ -118,6 +119,7 @@ def create_priests(num):
 
 def main():
     seed = ord(os.urandom(1))
+    #seed = 217
     print("Running with seed {}".format(seed))
     random.seed(seed)
     priests = create_priests(5)
@@ -125,17 +127,31 @@ def main():
     for priest in priests:
         priest.connect_to(router)
 
-    priests[0].initiate_ballot()
-    for t in range(30):
-        router.distribute()
+    any_decree_committed = False
+    iteration = 0
+    while not any_decree_committed:
+        print("Iteration {}".format(iteration))
+        priests[0].initiate_ballot()
+        for t in range(30):
+            router.distribute()
+            for priest in priests:
+                priest.distribute()
+
+        #printer = LogPrinter(router.get_log(), len(priests))
+        #printer.print()
+        #router.reset_log()
+
         for priest in priests:
-            priest.distribute()
+            if priest.get_decree() is not None:
+                any_decree_committed = True
+                break
+
+        iteration += 1
 
     printer = LogPrinter(router.get_log(), len(priests))
     printer.print()
-
-    for priest in priests:
-        print(priest.get_decree())
+    router.reset_log()
+    print("Selected decree is {}".format(priest.get_decree()))
 
 
 if __name__ == '__main__':
