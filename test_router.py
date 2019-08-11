@@ -26,6 +26,7 @@ class TestRouter(TestCase):
         self.router.broadcast(message_sent)
         self.router.distribute()
         receiver1.receive.assert_called_once()
+        self.router.distribute()
         receiver2.receive.assert_called_once()
 
     def test_send(self):

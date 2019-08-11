@@ -2,12 +2,15 @@ from router import Router
 from message import Packet
 from collections import deque
 import re
+from log_printer import LogPrinter
+import random
+import os
 
 
 class PreliminaryPriest:
     def __init__(self):
         self.__router = None
-        self.__initiated_ballot = None
+        self.__last_initiated_ballot = -1
         self.__num_participants = 0
         self.__quorum = 0
         self.__num_received_last_vote = 0
@@ -18,6 +21,7 @@ class PreliminaryPriest:
         self.__received_votes = []
         self.__proposed_decree = None
         self.__queue = deque()
+        self.__time = 0
 
     def get_decree(self):
         return self.__decree
@@ -36,11 +40,11 @@ class PreliminaryPriest:
         if match:
             ballot = int(match.group(1))
             last_vote = int(match.group(2))
-            if ballot == self.__initiated_ballot:
+            if ballot == self.__last_initiated_ballot:
                 self.__num_received_last_vote += 1
         if self.__num_received_last_vote == self.__num_participants:
             self.__proposed_decree = 23
-            send = Packet(self, "BeginBallot({},{})".format(self.__initiated_ballot, self.__proposed_decree), None)
+            send = Packet(self, "BeginBallot({},{})".format(self.__last_initiated_ballot, self.__proposed_decree), None)
             self.__queue.append(send)
 
     def process_begin_ballot(self, packet):
@@ -59,9 +63,9 @@ class PreliminaryPriest:
         match = pattern.match(packet.get_message())
         if match:
             ballot = int(match.group(1))
-            if ballot == self.__initiated_ballot:
+            if ballot == self.__last_initiated_ballot:
                 self.__received_votes.append(packet.get_source())
-        if len(self.__received_votes) >= self.__quorum:
+        if len(self.__received_votes) == self.__quorum:
             self.__queue.append(Packet(self, "Success({})".format(self.__proposed_decree), None))
 
     def process_success(self, packet):
@@ -89,13 +93,14 @@ class PreliminaryPriest:
         router.add_endpoint(self)
 
     def initiate_ballot(self):
-        self.__initiated_ballot = 0
-        message = Packet(self, "NextBallot({})".format(self.__initiated_ballot), None)
+        self.__last_initiated_ballot = self.__last_initiated_ballot + 1
+        message = Packet(self, "NextBallot({})".format(self.__last_initiated_ballot), None)
         self.__num_participants = self.__router.get_num_endpoints()
         self.__quorum = int(self.__num_participants/2)+1
         self.__queue.append(message)
 
     def distribute(self):
+        self.__time += 1
         if len(self.__queue) > 0:
             message = self.__queue.popleft()
             if message.is_broadcast():
@@ -111,13 +116,10 @@ def create_priests(num):
     return priests
 
 
-def print_log(router):
-    log = router.get_log()
-    for entry in log:
-        print(entry)
-
-
 def main():
+    seed = ord(os.urandom(1))
+    print("Running with seed {}".format(seed))
+    random.seed(seed)
     priests = create_priests(5)
     router = Router()
     for priest in priests:
@@ -129,7 +131,8 @@ def main():
         for priest in priests:
             priest.distribute()
 
-    print_log(router)
+    printer = LogPrinter(router.get_log(), len(priests))
+    printer.print()
 
     for priest in priests:
         print(priest.get_decree())
